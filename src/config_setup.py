@@ -42,5 +42,5 @@ def get_config() -> AppConfig:
         raw = yaml.safe_load(f)
 
     # 'schema' is a reserved name in Pydantic v2 — rename key
-    raw["schema_"] = raw.pop("schema")
+    #raw["schema_"] = raw.pop("schema")
     return AppConfig(**raw)

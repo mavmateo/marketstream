@@ -10,4 +10,4 @@ logging:
  log_to_file: true
  log_path: "logs/pipeline.log"
  max_bytes: 10485760
- backup_count = 5
+ backup_count : 5
