@@ -9,7 +9,11 @@ from kafka.errors import KafkaError, NoBrokersAvailable
 
 from config.kafka_config import KafkaConfig
 
-logger = logging.getLogger(__name__)
+from src.logger_setup import get_config
+from src.logger_setup import get_logger
+
+
+logger = get_config(__name__)
 
 
 class BaseProducer(ABC):
@@ -48,7 +52,7 @@ class BaseProducer(ABC):
             ) from exc
 
     def close(self) -> None:
-        """Flush any buffered messages and close the producer cleanly."""
+        
         if self._producer:
             logger.info(
                 "Closing Kafka producer | total published=%d", self._published_count

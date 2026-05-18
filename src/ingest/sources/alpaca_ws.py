@@ -1,61 +1,226 @@
-
-
 import asyncio
+import json 
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Callable, Awaitable
 
-from alpaca.data.live import StockDataStream
+from logger_setup import get_config
+from logger_setup import get_logger
+
 
 from config.api_config import AlpacaConfig
 
-logger = logging.getLogger(__name__)
+import websockets
+from websockets.exceptions import (
+    ConnectionClosedError,
+    ConnectionClosedOK,
+    WebSocketException,
+)
+
+#logger = get_config()
+logger = get_logger(__name__)
+
+
+_BASE_URL = "wss://stream.data.alpaca.markets/v2/iex"
+
+_BACKOFF_INITIAL   = 1
+_BACKOFF_MULTIPLIER = 2
+_BACKOFF_CAP        = 60
+_BACKOFF_RESET_AFTER = 300
+
+def _parse_bar(msg: list) -> list[dict]:
+    
+        bars = []
+        for item in msg:
+            if item.get("T") != "b":
+                continue
+            try:
+                bars.append({
+                    "symbol":   item["S"],
+                    "market":   "stock",
+                    "timestamp": item["t"],
+                    "open":  float(item["o"]),
+                    "high":  float("h"),
+                    "low"  : float(item["l"]),
+                    "close" : float(item["c"]),
+                    "volume" : float(item["v"]),
+                    "trades" :  int(item.get("n",0)),
+                    "vwap" :   float(item.get("vw", 0)),
+                })
+        
+       
+    
+            except (KeyError, ValueError, TypeError) as exc:
+                logger.warning("Failed to parse bar: %s | item=%s", exc, item)
+        return bars
+    
 
 
 class AlpacaWebSocket:
-   
 
     def __init__(
-        self,
-        symbols:  list[str],
-        callback: Callable[[dict], Awaitable[None]],
-        interval: str = "1Min",
-        config:   AlpacaConfig | None = None,
-    ) -> None:
-        self.symbols  = [s.upper() for s in symbols]
+            self,
+            symbols:  list[str],
+            callback:  Callable[[dict], Awaitable[None]],
+            interval: str = "1m",
+            config: AlpacaConfig | None = None,
+
+      ) -> None:
+        if not symbols:
+            raise ValueError("At least one symbol must be specified")
+        
+
+
+        self.symbols = [s.upper() for s in symbols]
         self.callback = callback
-        self.interval = interval
+        self.interval  = interval
         self.config   = config or AlpacaConfig()
 
+
+        self._url         = _BASE_URL
+        self.running      = False
+        self._bar_count  = 0
+        self._connect_time: float | None = None
+
         
-        self._stream  = StockDataStream(
-            self.config.api_key,
-            self.config.secret_key,
+        logger.info(
+            "AlpacaWebsocket initiated | symbols=%s interval=%s",
+            self.symbols, self.interval,
+            
         )
-        self._running = False
 
     async def run(self) -> None:
-        self._running = True
-        self._stream.subscribe_bars(self._on_bar, *self.symbols)
-        logger.info("Alpaca stream started | symbols=%s", self.symbols)
-        await self._stream._run_forever()
+        self._running   = True
+        backoff         = _BACKOFF_INITIAL
+        attempt         = 0
 
+        while self._running:
+            attempt += 1
+            logger.info(
+                "Connecting to Alpaca stream (attempt %d) | url=%s",
+                attempt, self._url,
+            )
+
+            try:
+                async with websockets.connect(
+                    self._url,
+                    ping_interval = 20,
+                    ping_timeout = 10,
+                    close_timeout=5,
+                ) as ws:
+                    self._connect_time = time.monotonic()
+                    logger.info("Alpaca Websocket connected.")
+
+                    await ws.send(json.dumps({
+                    "action": "auth",
+                    "key" : self.config.api_key,
+                    "secret" : self.config.secret_key,
+                    }))
+                    response = json.loads(await ws.recv())
+                    if not any(m.get("T") == "success" for m in response):
+                        raise ConnectionError(f"Alpaca auth failed: {response}")
+                    
+                    
+                    await ws.send(json.dumps({
+                        "action": "subscribe",
+                        "bars" : self.symbols
+                    }))
+                    await self._listen(ws)
+
+            except ConnectionClosedOK:
+                logger.info("Alpaca Websocket closed cleanly.")
+                break
+
+            except ConnectionClosedError as exc:
+                logger.warning("Alpaca connection dropped: %s", exc) 
+
+            except WebSocketException as exc:
+                logger.error("Alpaca WebSocker error: %s", exc)
+
+            except OSError as exc:
+                logger.error("Network error connecting to Alpaca: %s", exc)
+
+            
+            if not self._running:
+                break
+
+            elapsed = (
+                time.monotonic() - self._connect_time
+                if self._connect_time else 0
+
+            )   
+            if elapsed >= _BACKOFF_RESET_AFTER:
+                backoff = _BACKOFF_INITIAL
+                logger.info("Back-off counter reset after clean run.")
+
+            else:
+                backoff = min(backoff * _BACKOFF_MULTIPLIER, _BACKOFF_CAP)
+
+            logger.info("Reconnecting in %s seconds ...", backoff)
+            await asyncio.sleep(backoff)
+
+        logger.info(
+            "AlpacaWebSocket stopped. Total bars emitted: %d", self._bar_count
+        )                            
+    
     def stop(self) -> None:
+        logger.info("Stop requested on AlpacaWebSocket.")
         self._running = False
-        self._stream.stop()
+        
+    async def _listen(self, ws) -> None:
 
-    async def _on_bar(self, bar) -> None:
-        tick = {
-            "symbol":    bar.symbol,
-            "market":    "stock",
-            "timestamp": bar.timestamp.isoformat(),
-            "open":      float(bar.open),
-            "high":      float(bar.high),
-            "low":       float(bar.low),
-            "close":     float(bar.close),
-            "price":     float(bar.close),
-            "volume":    float(bar.volume),
-            "trades":    getattr(bar, "trade_count", 0),
-            "closed":    True,
-            "interval":  self.interval,
-        }
-        await self.callback(tick)
+        async for raw in ws:
+            if not self._running:
+                break
+
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.warning("Received non-JSON data from Alpaca: %s", raw[:120])
+                continue
+            
+            bars = _parse_bar(msg)
+            for bar in bars:
+                self._bar_count += 1
+                await self.callback(bar)
+
+
+           
+
+
+async def _smoke_test() -> None:
+
+    received: list[dict] = []
+
+    async def on_bar(bar: dict) -> None:
+        received.append(bar)
+        print(
+            f"[{bar['timestamp']}] {bar['symbol']:10s} "
+            f"O={bar['open']:.2f} H={bar['high']:.2f} "
+            f"L={bar['low']:.2f}  C={bar['close']:.2f} "
+            f"vol={bar['volume']:.3f}"
+        )
+
+        if len(received) >= 5:
+            ws_instance.stop()
+
+
+    ws_instance = AlpacaWebSocket(
+        symbols=["MSFT", "GOOG", "AMZN"],
+        callback= on_bar,
+        interval = "1m",
+
+    )
+
+    await ws_instance.run()
+    print(f"\nSmoke test complete. Received {len(received)} bars.") 
+
+if __name__ == "__main__":
+     logging.basicConfig(
+     level = logging.INFO,
+     format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+
+     )
+
+asyncio.run(_smoke_test())

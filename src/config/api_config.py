@@ -35,7 +35,7 @@ class AlpacaConfig:
     secret_key: str = field(default_factory=lambda: os.getenv("ALPACA_SECRET_KEY", ""))
     base_url:   str = field(default_factory=lambda: os.getenv(
                                 "ALPACA_WS_URL",
-                                "wss://stream.data.alpaca.markets/v2"
+                                "wss://stream.data.alpaca.markets/v2/iex"
                             ))
     feed:       str = field(default_factory=lambda: os.getenv("ALPACA_FEED", "iex"))
  

@@ -8,13 +8,7 @@ load_dotenv()
 
 @dataclass
 class KafkaConfig:
-    """
-    Central Kafka settings used by every module in the pipeline.
-
-    Topic naming convention:
-        raw.<market>    — unprocessed ticks straight from the API
-        clean.<market>  — validated, normalised ticks from PySpark
-    """
+ 
     bootstrap_servers: list[str] = field(
         default_factory=lambda: os.getenv(
             "KAFKA_BROKER", "localhost:9092"
