@@ -2,11 +2,11 @@ import asyncio
 import json 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Callable, Awaitable
 
-from logger_setup import get_config
-from logger_setup import get_logger
+#from logger_setup import get_config
+#from logger_setup import get_logger
 
 
 from config.api_config import AlpacaConfig
@@ -19,7 +19,9 @@ from websockets.exceptions import (
 )
 
 #logger = get_config()
-logger = get_logger(__name__)
+#logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
+
 
 
 _BASE_URL = "wss://stream.data.alpaca.markets/v2/iex"
@@ -129,6 +131,10 @@ class AlpacaWebSocket:
                         "action": "subscribe",
                         "bars" : self.symbols
                     }))
+
+                    sub_response = json.loads(await ws.recv())
+                    logger.info("Subscription confirmed: %s", sub_response)
+
                     await self._listen(ws)
 
             except ConnectionClosedOK:
@@ -189,10 +195,24 @@ class AlpacaWebSocket:
                 await self.callback(bar)
 
 
+def _market_is_open() -> bool:
+        ET = timezone(timedelta(hours=-4))
+        now = datetime.now(ET)
+        if now.weekday() >= 5:
+            return False
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        return market_open <= now <= market_close
            
 
 
 async def _smoke_test() -> None:
+    if not _market_is_open():
+        ET = timezone(timedelta(hours=-4))
+        now = datetime.now(ET)
+        print(f"Market is closed. Current ET time: {now.strftime('%H:%M')}.")
+        print("Market opens Mon-Fri at 09:30 ET (13:30 Ghana time).")
+        return
 
     received: list[dict] = []
 
@@ -218,6 +238,13 @@ async def _smoke_test() -> None:
 
     await ws_instance.run()
     print(f"\nSmoke test complete. Received {len(received)} bars.") 
+
+   
+    
+
+
+
+
 
 if __name__ == "__main__":
      logging.basicConfig(
