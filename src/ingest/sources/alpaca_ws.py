@@ -41,7 +41,7 @@ def _parse_bar(msg: list) -> list[dict]:
                     "market":   "stock",
                     "timestamp": item["t"],
                     "open":  float(item["o"]),
-                    "high":  float("h"),
+                    "high":  float(item["h"]),
                     "low"  : float(item["l"]),
                     "close" : float(item["c"]),
                     "volume" : float(item["v"]),
@@ -79,7 +79,7 @@ class AlpacaWebSocket:
 
 
         self._url         = _BASE_URL
-        self.running      = False
+        self._running      = False
         self._bar_count  = 0
         self._connect_time: float | None = None
 
@@ -112,13 +112,16 @@ class AlpacaWebSocket:
                     self._connect_time = time.monotonic()
                     logger.info("Alpaca Websocket connected.")
 
+                    await ws.recv()
+
                     await ws.send(json.dumps({
                     "action": "auth",
                     "key" : self.config.api_key,
                     "secret" : self.config.secret_key,
                     }))
+
                     response = json.loads(await ws.recv())
-                    if not any(m.get("T") == "success" for m in response):
+                    if not any(m.get("msg") == "authenticated" for m in response):
                         raise ConnectionError(f"Alpaca auth failed: {response}")
                     
                     
@@ -223,4 +226,4 @@ if __name__ == "__main__":
 
      )
 
-asyncio.run(_smoke_test())
+     asyncio.run(_smoke_test())
