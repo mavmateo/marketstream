@@ -13,7 +13,7 @@ from src.logger_setup import get_config
 from src.logger_setup import get_logger
 
 
-logger = get_config(__name__)
+logger = logging.getLogger(__name__)
 
 
 class BaseProducer(ABC):
