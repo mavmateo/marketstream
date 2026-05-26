@@ -1,4 +1,5 @@
 import os
+import logging
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
@@ -6,7 +7,7 @@ from src.logger_setup import get_config
 from src.logger_setup import get_logger
 
 
-logger = get_config()
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 

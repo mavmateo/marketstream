@@ -224,9 +224,9 @@ async def _smoke_test() -> None:
 
 
 if __name__ == "__main__":
-     logging.basicConfig(
-     level = logging.INFO,
-     format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-          )
+    logging.basicConfig(
+        level = logging.INFO,
+        format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    )
 
-asyncio.run(_smoke_test())
+    asyncio.run(_smoke_test())
