@@ -3,8 +3,7 @@ import logging
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
-from src.logger_setup import get_config
-from src.logger_setup import get_logger
+
 
 
 logger = logging.getLogger(__name__)

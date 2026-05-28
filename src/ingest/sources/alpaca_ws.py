@@ -5,8 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Callable, Awaitable
 
-#from logger_setup import get_config
-#from logger_setup import get_logger
+
 
 
 from config.api_config import AlpacaConfig
@@ -18,8 +17,6 @@ from websockets.exceptions import (
     WebSocketException,
 )
 
-#logger = get_config()
-#logger = get_logger(__name__)
 logger = logging.getLogger(__name__)
 
 

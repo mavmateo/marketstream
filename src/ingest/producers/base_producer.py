@@ -9,9 +9,6 @@ from kafka.errors import KafkaError, NoBrokersAvailable
 
 from config.kafka_config import KafkaConfig
 
-from src.logger_setup import get_config
-from src.logger_setup import get_logger
-
 
 logger = logging.getLogger(__name__)
 

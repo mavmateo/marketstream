@@ -8,8 +8,6 @@ from config.api_config import AlpacaConfig
 from ..sources.alpaca_ws import AlpacaWebSocket
 
 
-from src.logger_setup import get_config
-from src.logger_setup import get_logger
 
 
 logger = logging.getLogger(__name__)
