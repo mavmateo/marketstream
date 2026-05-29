@@ -13,7 +13,7 @@ alpaca-py==0.26.0          # Alpaca Markets official SDK
 requests==2.31.0           # Polygon REST calls
 
 # ── PySpark ───────────────────────────────────────────────────────
-pyspark==3.5.1
+pyspark==4.1.1
 
 # ── AI / ML ───────────────────────────────────────────────────────
 scikit-learn==1.4.2
