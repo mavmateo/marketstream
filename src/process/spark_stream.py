@@ -3,12 +3,20 @@ import json
 import logging
 from config.kafka_config import KafkaConfig
 
+from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame
+from pyspark.sql.types import (
+    StructType, StructField,
+    StringType, DoubleType, TimestampType, IntegerType, BooleanType
+)
+from pyspark.sql.functions import col, from_json
+
 
 
 
 
 logger = logging.getLogger(__name__)
-from pyspark.sql import SparkSession
+
 
 
 def _create_spark_session(config: KafkaConfig) -> SparkSession:
@@ -28,7 +36,7 @@ def _create_spark_session(config: KafkaConfig) -> SparkSession:
 
 def _read_stream(spark: SparkSession, config: KafkaConfig):
     try:
-        rawstocks_stream = (spark.readStream
+        raw_stream = (spark.readStream
                             .format("kafka")
                             .option("kafka.bootstrap.servers",",".join(config.bootstrap_servers))
                             .option("subscribe",f"{config.RAW_STOCKS_TOPIC},{config.RAW_CRYPTO_TOPIC}")
@@ -37,7 +45,7 @@ def _read_stream(spark: SparkSession, config: KafkaConfig):
                             .load()
                             )
         logger.info("Kafka stream created for topic: %s and %s", config.RAW_STOCKS_TOPIC, config.RAW_CRYPTO_TOPIC)
-        return rawstocks_stream
+        return raw_stream
     
     except Exception as e:
         logger.error(f"Failed to read from kafka, {e}", exc_info=True)
@@ -45,9 +53,41 @@ def _read_stream(spark: SparkSession, config: KafkaConfig):
     
     
     
-
     
-#def _parse_json(): 
+def _parse_json(raw_stream: DataFrame)-> DataFrame: 
+    try:
+        OHLCV_SCHEMA = StructType([
+            StructField("symbol", StringType(), True),
+            StructField("market", StringType(), True),
+            StructField("timestamp", StringType(), True),
+            StructField("open", DoubleType(), True),
+            StructField("high", DoubleType(), True),
+            StructField("low", DoubleType(), True),
+            StructField("close", DoubleType(), True),
+            StructField("price", DoubleType(), True),
+            StructField("volume", DoubleType(), True),
+            StructField("trades", IntegerType(), True),
+            StructField("vwap", DoubleType(), True),
+            StructField("closed", BooleanType(), True),
+            StructField("interval", StringType(), True)
+                          
+    ])
+        parsed_data = raw_stream.withColumn("data", from_json(col("value").cast("string"), OHLCV_SCHEMA)) \
+                                .select(
+                                    col("topic"),
+                                    col("timestamp").alias("kafka_timestamp"),
+                                    col("data.*")
+                                     
+                                    ) \
+                                .filter(col("symbol").isNotNull())
+        logger.info("JSON parsing applied. Schema: %s", parsed_data.schema.simpleString())
+        return parsed_data
+           
+    except Exception as e: 
+        logger.error("Failed to parse Kafka JSON: %s", e, exc_info=True)
+        raise     
+
+
 
 #def _transform() :
 
@@ -65,10 +105,11 @@ def main() -> None:
         logger.info("Stream reading process initiated...")
         logger.info("="*75)
 
-        rawstocks_stream = _read_stream(spark, kafka_config) 
+        raw_stream = _read_stream(spark, kafka_config) 
+        parsed_stream = _parse_json(raw_stream)
 
 
-        query = (rawstocks_stream
+        query = (parsed_stream
                     .writeStream
                     .format("console")
                     .option("truncate", False)
@@ -81,7 +122,6 @@ def main() -> None:
         logger.critical("Application failed", exc_info=True)  
         sys.exit(1)  
         
-   #raw_stream.printSchema()
 
 
 
