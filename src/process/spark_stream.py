@@ -1,5 +1,4 @@
 import sys
-import json
 import logging
 from config.kafka_config import KafkaConfig
 
@@ -10,10 +9,6 @@ from pyspark.sql.types import (
     StringType, DoubleType, TimestampType, IntegerType, BooleanType
 )
 from pyspark.sql.functions import col, from_json
-
-
-
-
 
 logger = logging.getLogger(__name__)
 
