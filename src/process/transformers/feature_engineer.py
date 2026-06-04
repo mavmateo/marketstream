@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def feature_engineer(df: DataFrame) -> DataFrame:
     logger.info("="*75)
-    logger.info("Calculating and adding price range....")
+    logger.info("Engineering features....")
     eng_df = df.withColumn("price_range", col("high") - col("low"))
     logger.info("Price range added")
     

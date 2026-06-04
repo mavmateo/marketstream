@@ -9,16 +9,16 @@ logger = logging.getLogger(__name__)
 def validate(df:DataFrame) -> DataFrame:
     logger.info("="*75)
     logger.info("Checking high rows to ensure they follow the schema standards....")
-    valid_df = df.filter((col("high") < col("open")))
-    valid_df = valid_df.filter(col("high") < col("close")) 
-    valid_df = valid_df.filter(col("high") < col("low"))                     
+    valid_df = df.filter((col("high") < col("open")) &
+                        (col("high") < col("close")) &
+                        (col("high") < col("low")))                    
     logger.info("High rows schema validated....")
     
     logger.info("="*75)
     logger.info("Checking low rows to ensure they follow the schema standards....")
-    valid_df = valid_df.filter((col("low") > col("open"))) 
-    valid_df = valid_df.filter(col("low") > col("close")) 
-    valid_df = valid_df.filter(col("low") > col("high"))                   
+    valid_df = valid_df.filter((col("low") > col("open")) & 
+                              (col("low") > col("close")) &
+                              (col("low") > col("high")) )                  
     logger.info("Low rows schema found....")
 
     logger.info("="*75)
@@ -29,7 +29,7 @@ def validate(df:DataFrame) -> DataFrame:
     logger.info("="*75)
     logger.info("Checking volume rows to ensure they follow the schema standards....")
     valid_df = valid_df.filter(col("volume") <= 0 )
-    logger.info("volume rows schema validated...." )
+    logger.info("Volume rows schema validated...." )
 
     logger.info("Validation complete.")
 
