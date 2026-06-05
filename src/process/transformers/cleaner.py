@@ -1,20 +1,16 @@
 import logging
 
-from pyspark.sql import col, greatest, abs, least
+from pyspark.sql.functions import col
 from pyspark.sql import DataFrame
 
 logger = logging.getLogger(__name__)
 
 def clean(df: DataFrame) -> DataFrame:
-    logger.info("="*75)
-    logger.info("Dropping rows with null symbol rows.....")
-    clean_df = df.dropna(subset=['symbol'], how='any')
-    logger.info("Null symbol rows dropped...")
-
+    
     logger.info("="*75)
     logger.info("Dropping rows with null open, high, low and close rows....")
-    clean_df = clean_df.dropna(subset=['open', 'high', 'low', 'close'], how='any')
-    logger.info("Null rows for open, high, low, close dropped....")
+    clean_df = df.dropna(subset=[ 'symbol', 'open', 'high', 'low', 'close'], how='any')
+    logger.info("Null rows for symbol,open, high, low, close dropped....")
 
     logger.info("="*75)
     logger.info("Dropping rows with 0 or negative price rows....")

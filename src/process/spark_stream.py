@@ -10,6 +10,8 @@ from pyspark.sql.types import (
 )
 from pyspark.sql.functions import col, from_json
 
+from process.transformers import clean, validate, feature_engineer
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +37,7 @@ def _read_stream(spark: SparkSession, config: KafkaConfig):
                             .format("kafka")
                             .option("kafka.bootstrap.servers",",".join(config.bootstrap_servers))
                             .option("subscribe",f"{config.RAW_STOCKS_TOPIC},{config.RAW_CRYPTO_TOPIC}")
-                            .option("startingOffsets", "latest")
+                            .option("startingOffsets", "earliest")
                             .option("failOnDataLoss", "false")
                             .load()
                             )
@@ -84,7 +86,14 @@ def _parse_json(raw_stream: DataFrame)-> DataFrame:
 
 
 
-#def _transform() :
+def _transform(df: DataFrame) -> DataFrame:
+    logger.info("="*75)
+    logger.info("Starting transformation pipeline...")
+    df = clean(df)
+    df = validate(df)
+    df = feature_engineer(df)
+    logger.info("Transformation pipeline complete.")
+    return df
 
 #def _write_kafka():
 
@@ -102,9 +111,10 @@ def main() -> None:
 
         raw_stream = _read_stream(spark, kafka_config) 
         parsed_stream = _parse_json(raw_stream)
+        clean_stream = _transform(parsed_stream)
 
 
-        query = (parsed_stream
+        query = (clean_stream
                     .writeStream
                     .format("console")
                     .option("truncate", False)
@@ -120,10 +130,6 @@ def main() -> None:
 
 
 
-
-
-
-#clean_data = raw_stream.select(...).filter(...).withColumn(...) 
 
 
 
