@@ -8,7 +8,7 @@ from pyspark.sql.types import (
     StructType, StructField,
     StringType, DoubleType, TimestampType, IntegerType, BooleanType
 )
-from pyspark.sql.functions import col, from_json
+from pyspark.sql.functions import col, from_json, struct, to_json, when
 
 from process.transformers import clean, validate, feature_engineer
 
@@ -95,8 +95,25 @@ def _transform(df: DataFrame) -> DataFrame:
     logger.info("Transformation pipeline complete.")
     return df
 
-#def _write_kafka():
-
+def _write_kafka(clean_stream: DataFrame, config: KafkaConfig):
+    logger.info("="*75)
+    logger.info("Writing clean stream dataframe rows to kafka....")
+    
+    kafka_df = (clean_stream.withColumn("topic",
+                                        when(col("market")=="stock", config.CLEAN_STOCKS_TOPIC)
+                                        .when(col("market")=="crypto", config.CLEAN_CRYPTO_TOPIC)
+                                        .withColumn("value",
+                                                    to_json(struct(*[col(c) for c in clean_stream.columns
+                                                                     if c != "topic"])))
+                                        .withColumn("key", col("symbol"))
+                                        .select("topic", "key", "value")                             
+                                        ))
+    return (kafka_df.writeStream
+            .format("kafka")
+            .option("kafka.bootstrap.servers",
+                    ",".join(config.boostrap_servers))
+                    .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
+                    .start())
 
 #def _write_s3() :
 
