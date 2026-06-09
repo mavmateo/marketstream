@@ -1,0 +1,2 @@
+2026-06-09 08:16:58.320 GMT [34020] FATAL:  could not access file "timescaledb": No such file or directory
+2026-06-09 08:16:58.320 GMT [34020] LOG:  database system is shut down

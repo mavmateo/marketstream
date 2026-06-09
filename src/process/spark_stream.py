@@ -6,9 +6,9 @@ from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame
 from pyspark.sql.types import (
     StructType, StructField,
-    StringType, DoubleType, TimestampType, IntegerType, BooleanType
-)
-from pyspark.sql.functions import col, from_json, struct, to_json, when
+    StringType, DoubleType, TimestampType, IntegerType, BooleanType)
+from pyspark.sql.functions import col, from_json, struct, to_json, to_timestamp, when , year, month, dayofmonth
+from pyspark.sql.streaming import StreamingQuery
 
 from process.transformers import clean, validate, feature_engineer
 
@@ -95,27 +95,84 @@ def _transform(df: DataFrame) -> DataFrame:
     logger.info("Transformation pipeline complete.")
     return df
 
-def _write_kafka(clean_stream: DataFrame, config: KafkaConfig):
-    logger.info("="*75)
-    logger.info("Writing clean stream dataframe rows to kafka....")
+def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery:
+    try:
+        logger.info("="*75)
+        logger.info("Writing clean stream to kafka....")
+        
+        kafka_df = (clean_stream
+                        .withColumn("topic",
+                           when(col("market")=="stock", config.CLEAN_STOCKS_TOPIC)
+                           .when(col("market")=="crypto", config.CLEAN_CRYPTO_TOPIC)
+                        )
+                           .withColumn("value",
+                                    to_json(struct(*[col(c) for c in clean_stream.columns
+                                                    if c != "topic"]))
+                        )
+                        .withColumn("key", col("symbol"))
+                        .select("topic", "key", "value")                             
+                    )
+        return (kafka_df.writeStream
+                .format("kafka")
+                .option("kafka.bootstrap.servers", ",".join(config.bootstrap_servers))
+                        .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
+                        .start())
     
-    kafka_df = (clean_stream.withColumn("topic",
-                                        when(col("market")=="stock", config.CLEAN_STOCKS_TOPIC)
-                                        .when(col("market")=="crypto", config.CLEAN_CRYPTO_TOPIC)
-                                        .withColumn("value",
-                                                    to_json(struct(*[col(c) for c in clean_stream.columns
-                                                                     if c != "topic"])))
-                                        .withColumn("key", col("symbol"))
-                                        .select("topic", "key", "value")                             
-                                        ))
-    return (kafka_df.writeStream
-            .format("kafka")
-            .option("kafka.bootstrap.servers",
-                    ",".join(config.boostrap_servers))
-                    .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
-                    .start())
+    except Exception as e:
+        logger.error("Failed to write clean stream to Kafka: %s", e, exc_info=True)
+        raise
 
-#def _write_s3() :
+
+    def _write_timescale(clean_stream: DataFrame) -> StreamingQuery:
+        logger.info("="*75)
+        logger.info("Writing clean stream to timescale-db....")
+        return (clean_stream.writeStream
+                .foreachBatch(_write_batch_to_timescale)
+                .option("checkpointLocation", 
+                        "/tmp/checkpoints/write_timescale")
+                .start())
+    
+    def _write_batch_to_timescale(batch_df, batch_id):
+        (batch_df.write
+         .format("jdbc")
+         .option("url",
+                 "jdbc:postgresql://localhost:5432/marketstream")
+         .option("dbtable", "ohlcv_ticks")
+         .option("user" , "postgres") 
+         .option("password" ,"password")
+         .option("driver", "org.postgresql.Driver")
+         .mode("append")
+         .save())
+
+
+
+# def _write_s3(clean_stream: DataFrame) -> StreamingQuery:
+#     try:
+#         logger.info("="*75)
+#         logger.info("Writing clean stream to AWS S3 ....")
+
+#         s3_df = (clean_stream
+#                             .withColumn("timestamp_parsed", to_timestamp(col("timestamp")))
+#                             .withColumn("year", year(col("timestamp_parsed")))
+#                             .withColumn("month", month(col("timestamp_parsed")))
+#                             .withColumn("day", dayofmonth(col("timestamp_parsed")))
+#                             .drop("timestamp_parsed")             
+                                        
+#                 )
+        
+#         return (s3_df.writeStream
+#                 .format("parquet")
+#                 .option("path", "s3a://bucket/market-data/")
+#                 .option("checkpointLocation", "/tmp/checkpoints/write_s3")
+#                 .partitionBy("market", "year", "month", "day")
+#                 .start())
+    
+#     except Exception as e:
+#         logger.error("Failed to write clean stream to AWS S3: %s", e, exc_info=True)
+#         raise
+
+
+
 
 def main() -> None: 
    try:
@@ -129,6 +186,12 @@ def main() -> None:
         raw_stream = _read_stream(spark, kafka_config) 
         parsed_stream = _parse_json(raw_stream)
         clean_stream = _transform(parsed_stream)
+
+        kafka_query = _write_kafka(clean_stream, kafka_config)
+        #s3_query = _write_s3(clean_stream)
+
+        kafka_query.awaitTermination()
+        #s3_query.awaitTermination()
 
 
         query = (clean_stream

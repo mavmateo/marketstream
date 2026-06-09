@@ -29,6 +29,25 @@ services:
      - kafka_data:/var/lib/kafka/data
 volumes:
   kafka_data:
-    driver: local     
+    driver: local   
+
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB:       marketstream
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      
+  volumes:
+    kafka_data:
+      driver: local
+    timescale_data:
+      driver: local
                
 
