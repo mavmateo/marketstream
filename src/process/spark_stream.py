@@ -20,7 +20,7 @@ def _create_spark_session(config: KafkaConfig) -> SparkSession:
     builder = SparkSession.builder.appName("MarketStreamApp")
     builder = builder.config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1")
     builder = builder.config("spark.sql.streaming.checkpointLocation", "/tmp/checkpoint/marketstream")
-    #builder = builder.config("spark.sql.adaptive.enabled", "true")           
+    builder = builder.config("spark.jars","infra/jars/postgresql-42.7.3.jar")        
     spark = builder.getOrCreate()
 
     spark.sparkContext.setLogLevel("WARN")
@@ -41,11 +41,11 @@ def _read_stream(spark: SparkSession, config: KafkaConfig):
                             .option("failOnDataLoss", "false")
                             .load()
                             )
-        logger.info("Kafka stream created for topic: %s and %s", config.RAW_STOCKS_TOPIC, config.RAW_CRYPTO_TOPIC)
+        logger.info("[READ]Kafka stream created for topic: %s and %s", config.RAW_STOCKS_TOPIC, config.RAW_CRYPTO_TOPIC)
         return raw_stream
     
     except Exception as e:
-        logger.error(f"Failed to read from kafka, {e}", exc_info=True)
+        logger.error(f"[READ]Failed to read from kafka, {e}", exc_info=True)
         raise
     
     
@@ -77,11 +77,11 @@ def _parse_json(raw_stream: DataFrame)-> DataFrame:
                                      
                                     ) \
                                 .filter(col("symbol").isNotNull())
-        logger.info("JSON parsing applied. Schema: %s", parsed_data.schema.simpleString())
+        logger.info("[PARSE]JSON parsing applied. Schema: %s", parsed_data.schema.simpleString())
         return parsed_data
            
     except Exception as e: 
-        logger.error("Failed to parse Kafka JSON: %s", e, exc_info=True)
+        logger.error("[PARSE]Failed to parse Kafka JSON: %s", e, exc_info=True)
         raise     
 
 
@@ -98,7 +98,7 @@ def _transform(df: DataFrame) -> DataFrame:
 def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery:
     try:
         logger.info("="*75)
-        logger.info("Writing clean stream to kafka....")
+        logger.info("[WRITE]Writing clean stream to kafka....")
         
         kafka_df = (clean_stream
                         .withColumn("topic",
@@ -119,30 +119,30 @@ def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery
                         .start())
     
     except Exception as e:
-        logger.error("Failed to write clean stream to Kafka: %s", e, exc_info=True)
+        logger.error("[WRITE]Failed to write clean stream to Kafka: %s", e, exc_info=True)
         raise
 
 
-    def _write_timescale(clean_stream: DataFrame) -> StreamingQuery:
-        logger.info("="*75)
-        logger.info("Writing clean stream to timescale-db....")
-        return (clean_stream.writeStream
-                .foreachBatch(_write_batch_to_timescale)
-                .option("checkpointLocation", 
-                        "/tmp/checkpoints/write_timescale")
-                .start())
-    
-    def _write_batch_to_timescale(batch_df, batch_id):
-        (batch_df.write
-         .format("jdbc")
-         .option("url",
-                 "jdbc:postgresql://localhost:5432/marketstream")
-         .option("dbtable", "ohlcv_ticks")
-         .option("user" , "postgres") 
-         .option("password" ,"password")
-         .option("driver", "org.postgresql.Driver")
-         .mode("append")
-         .save())
+def _write_timescale(clean_stream: DataFrame) -> StreamingQuery:
+    logger.info("="*75)
+    logger.info("[WRITE]Writing clean stream to timescale-db....")
+    return (clean_stream.writeStream
+            .foreachBatch(_write_batch_to_timescale)
+            .option("checkpointLocation", 
+                    "/tmp/checkpoints/write_timescale")
+            .start())
+
+def _write_batch_to_timescale(batch_df, batch_id):
+    (batch_df.write
+        .format("jdbc")
+        .option("url",
+                "jdbc:postgresql://localhost:5432/marketstream")
+        .option("dbtable", "ohlcv_ticks")
+        .option("user" , "postgres") 
+        .option("password" ,"password")
+        .option("driver", "org.postgresql.Driver")
+        .mode("append")
+        .save())
 
 
 
@@ -188,21 +188,17 @@ def main() -> None:
         clean_stream = _transform(parsed_stream)
 
         kafka_query = _write_kafka(clean_stream, kafka_config)
-        #s3_query = _write_s3(clean_stream)
+        timescale_query = _write_timescale(clean_stream)
+        logger.info("All streams started. Awaiting termination....")
 
         kafka_query.awaitTermination()
-        #s3_query.awaitTermination()
+        timescale_query.awaitTermination()
 
 
-        query = (clean_stream
-                    .writeStream
-                    .format("console")
-                    .option("truncate", False)
-                    .start())
-        
-        query.awaitTermination()
+        spark.streams.awaitAnyTermination
+
    except KeyboardInterrupt:
-        logger.info("Streaming stopped by user")
+        logger.info("Streaming stopped by user.")
    except Exception as e:
         logger.critical("Application failed", exc_info=True)  
         sys.exit(1)  

@@ -12,24 +12,24 @@ def validate(df:DataFrame) -> DataFrame:
     df = df.filter((col("high") >= col("open")) &
                         (col("high") >= col("close")) &
                         (col("high") >= col("low")))                    
-    logger.info("High rows schema validated....")
+    logger.info("[VALIDATE]High rows schema validated....")
     
     logger.info("="*75)
     logger.info("Checking low rows to ensure they follow the schema standards....")
     df = df.filter((col("low") <= col("open")) & 
                               (col("low") <= col("close")) &
                               (col("low") <= col("high")) )                  
-    logger.info("Low rows schema found....")
+    logger.info("[VALIDATE]Low rows schema found....")
 
     logger.info("="*75)
     logger.info("Checking price rows to ensure they follow the schema standards....")
     df = df.filter(col("price") == col("close"))
-    logger.info("Price rows schema validated....")
+    logger.info("[VALIDATE]Price rows schema validated....")
 
     logger.info("="*75)
     logger.info("Checking volume rows to ensure they follow the schema standards....")
     df = df.filter(col("volume") > 0 )
-    logger.info("Volume rows schema validated...." )
+    logger.info("[VALIDATE]Volume rows schema validated...." )
 
     logger.info("Validation complete.")
 
