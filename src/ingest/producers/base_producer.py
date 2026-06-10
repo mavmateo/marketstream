@@ -22,7 +22,6 @@ class BaseProducer(ABC):
         self._producer: KafkaProducer | None = None
         self._published_count = 0
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
        
@@ -37,8 +36,7 @@ class BaseProducer(ABC):
                 acks               = self.config.acks,
                 retries            = self.config.retries,
                 linger_ms          = self.config.linger_ms,
-                # Compress batches — cuts Kafka storage and network by ~60%
-                # for JSON tick data
+                
                 compression_type   = "gzip",
             )
             logger.info("Kafka producer connected.")
@@ -58,7 +56,6 @@ class BaseProducer(ABC):
             self._producer.close()
             self._producer = None
 
-    # ── Publishing ────────────────────────────────────────────────────────────
 
     def publish(self, tick: dict) -> None:
      
@@ -79,7 +76,6 @@ class BaseProducer(ABC):
 
         self._published_count += 1
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
 
     def _on_send_success(self, record_metadata) -> None:
         logger.debug(
@@ -92,14 +88,12 @@ class BaseProducer(ABC):
     def _on_send_error(self, exc: KafkaError) -> None:
         logger.error("Failed to publish message to Kafka: %s", exc)
 
-    # ── Serialisation ─────────────────────────────────────────────────────────
 
     @staticmethod
     def _serialise(value: dict) -> bytes:
         """JSON-encode a tick dict to UTF-8 bytes for Kafka."""
         return json.dumps(value, default=str).encode("utf-8")
 
-    # ── Abstract interface ────────────────────────────────────────────────────
 
     @abstractmethod
     async def start(self) -> None:

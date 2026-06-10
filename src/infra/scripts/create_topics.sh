@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BROKER="localhost:9092"
-CONTAINER="infra-kafka-1"
+CONTAINER="kafka"
 KAFKA_TOPICS="/opt/kafka/bin/kafka-topics.sh"
 
 topics=(

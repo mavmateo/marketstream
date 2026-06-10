@@ -133,16 +133,34 @@ def _write_timescale(clean_stream: DataFrame) -> StreamingQuery:
             .start())
 
 def _write_batch_to_timescale(batch_df, batch_id):
-    (batch_df.write
+    if batch_df.isEmpty():
+         return
+
+    ts_df = (batch_df.withColumn("timestamp", 
+                                to_timestamp(col("timestamp")))
+                    .withColumnRenamed("timestamp", "time") \
+                    .select(
+                          "time", "symbol", "market",
+                        "open", "high", "low", "close",
+                        "price", "volume", "trades", "vwap",
+                        "price_range", "body_size",
+                        "upper_shadow", "lower_shadow",
+                        "is_bullish", "interval"
+                     ))
+
+
+    (ts_df.write
         .format("jdbc")
         .option("url",
                 "jdbc:postgresql://localhost:5432/marketstream")
         .option("dbtable", "ohlcv_ticks")
         .option("user" , "postgres") 
-        .option("password" ,"password")
+        .option("password" ,"postgres")
         .option("driver", "org.postgresql.Driver")
         .mode("append")
         .save())
+    
+    logger.info("[WRITE]Batch %d written to TimescaleDB - %d rows", batch_id, ts_df.count())
 
 
 
