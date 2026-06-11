@@ -23,7 +23,7 @@ def _create_spark_session(config: KafkaConfig) -> SparkSession:
     builder = builder.config("spark.jars","infra/jars/postgresql-42.7.3.jar")        
     spark = builder.getOrCreate()
 
-    spark.sparkContext.setLogLevel("WARN")
+    spark.sparkContext.setLogLevel("ERROR")
     logger.info("="*75)
     logger.info("Spark version: %s",spark.version)
     logger.info("Spark Session created successfully!")
@@ -89,11 +89,19 @@ def _parse_json(raw_stream: DataFrame)-> DataFrame:
 def _transform(df: DataFrame) -> DataFrame:
     logger.info("="*75)
     logger.info("Starting transformation pipeline...")
-    df = clean(df)
-    df = validate(df)
-    df = feature_engineer(df)
+    cleaned_df = clean(df)
+    (cleaned_df.groupBy("market").count()
+               .writeStream.format("console").outputMode("complete")
+               .queryName("after_clean").start())
+    
+    validated_df = validate(cleaned_df)
+    (validated_df.groupBy("market").count()
+                 .writeStream.format("console").outputMode("complete")
+                 .queryName("after_validate").start())
+
+    clean_df = feature_engineer(validated_df)
     logger.info("Transformation pipeline complete.")
-    return df
+    return clean_df
 
 def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery:
     try:
@@ -203,12 +211,24 @@ def main() -> None:
 
         raw_stream = _read_stream(spark, kafka_config) 
         parsed_stream = _parse_json(raw_stream)
+        (parsed_stream.groupBy("market").count()
+                      .writeStream.format("console").outputMode("complete")
+                      .queryName("after_parse").start())
+        
         clean_stream = _transform(parsed_stream)
+
+        # debug_query = (parsed_stream.groupBy("market")
+        #                               .count()
+        #                               .writeStream
+        #                               .format("console")
+        #                               .outputMode("complete")
+        #                               .start())
 
         kafka_query = _write_kafka(clean_stream, kafka_config)
         timescale_query = _write_timescale(clean_stream)
         logger.info("All streams started. Awaiting termination....")
 
+        #debug_query.awaitTermination()
         kafka_query.awaitTermination()
         timescale_query.awaitTermination()
 

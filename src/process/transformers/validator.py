@@ -10,15 +10,15 @@ logger = logging.getLogger(__name__)
 def validate(df:DataFrame) -> DataFrame:
     logger.info("="*75)
     logger.info("Checking high rows to ensure they follow the schema standards....")
-    df = df.filter((col("high") >= col("open")) &
-                        (col("high") >= col("close")) &
+    df = df.filter((col("high") >= col("open") - 0.0001) &
+                        (col("high") >= col("close") - 0.0001) &
                         (col("high") >= col("low")))                    
     logger.info("[VALIDATE]High rows schema validated....")
     
     logger.info("="*75)
     logger.info("Checking low rows to ensure they follow the schema standards....")
-    df = df.filter((col("low") <= col("open")) & 
-                              (col("low") <= col("close")) &
+    df = df.filter((col("low") <= col("open") - 0.0001) & 
+                              (col("low") <= col("close") - 0.0001) &
                               (col("low") <= col("high")) )                  
     logger.info("[VALIDATE]Low rows schema found....")
 

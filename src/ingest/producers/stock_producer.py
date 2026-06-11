@@ -39,8 +39,8 @@ class StockProducer(BaseProducer):
 
     async def start(self) -> None:
 
-        self.alpaca_config.validate()   # raises if API keys are missing
-        self.connect()                  # opens Kafka producer
+        self.alpaca_config.validate()   
+        self.connect()                  
  
         self._source = AlpacaWebSocket(
             symbols  = self.symbols,
