@@ -1,4 +1,6 @@
-import os
+#check these code and see if there might be a bug causing no stocks to be written in timescalde db. if not then we can cancel out code bugs as the issue and drill down our debugging
+
+#spark_stream.py
 import sys
 import logging
 from config.kafka_config import KafkaConfig
@@ -21,8 +23,7 @@ def _create_spark_session(config: KafkaConfig) -> SparkSession:
     builder = SparkSession.builder.appName("MarketStreamApp")
     builder = builder.config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1")
     builder = builder.config("spark.sql.streaming.checkpointLocation", "/tmp/checkpoint/marketstream")
-    JAR_PATH = os.path.abspath("infra/jars/postgresql-42.7.3.jar")
-    builder.config("spark.jars", JAR_PATH)       
+    builder = builder.config("spark.jars","infra/jars/postgresql-42.7.3.jar")        
     spark = builder.getOrCreate()
 
     spark.sparkContext.setLogLevel("ERROR")
@@ -92,9 +93,15 @@ def _transform(df: DataFrame) -> DataFrame:
     logger.info("="*75)
     logger.info("Starting transformation pipeline...")
     cleaned_df = clean(df)
+    (cleaned_df.groupBy("market").count()
+               .writeStream.format("console").outputMode("complete")
+               .queryName("after_clean").start())
     
     validated_df = validate(cleaned_df)
-    
+    (validated_df.groupBy("market").count()
+                 .writeStream.format("console").outputMode("complete")
+                 .queryName("after_validate").start())
+
     clean_df = feature_engineer(validated_df)
     logger.info("Transformation pipeline complete.")
     return clean_df
@@ -223,6 +230,12 @@ def main() -> None:
         kafka_query = _write_kafka(clean_stream, kafka_config)
         timescale_query = _write_timescale(clean_stream)
         logger.info("All streams started. Awaiting termination....")
+
+        #debug_query.awaitTermination()
+        kafka_query.awaitTermination()
+        timescale_query.awaitTermination()
+
+
         spark.streams.awaitAnyTermination
 
    except KeyboardInterrupt:
@@ -245,3 +258,118 @@ if __name__ == "__main__":
         format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     )
     main()
+
+    #cleaner.py
+    import logging
+
+from pyspark.sql.functions import col
+from pyspark.sql import DataFrame
+
+logger = logging.getLogger(__name__)
+
+def clean(df: DataFrame) -> DataFrame:
+    
+    logger.info("="*75)
+    logger.info("Dropping rows with null open, high, low and close rows....")
+    clean_df = df.dropna(subset=[ 'symbol', 'open', 'high', 'low', 'close'], how='any')
+    logger.info("[CLEAN]Null rows for symbol,open, high, low, close dropped....")
+
+    logger.info("="*75)
+    logger.info("Dropping rows with 0 or negative price rows....")
+    clean_df = clean_df.filter(col("price") > 0)
+    logger.info("[CLEAN]0 and negative price rows dropped....")
+
+    logger.info("="*75)
+    logger.info("Dropping rows with negative volumes rows....")
+    clean_df = clean_df.filter(col("volume") >= 0)
+    logger.info("[CLEAN]Negative volume rows dropped....")
+
+    logger.info("="*75)
+    logger.info("Dropping rows where high < low")
+    clean_df = clean_df.filter(col("high") >= col("low"))
+    logger.info("[CLEAN]High rows lower than low dropped....")
+
+    logger.info("Cleaning complete.")
+
+    return clean_df
+
+
+
+  # validator.py
+import logging
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import col
+from pyspark.sql.functions import abs as spark_abs
+
+logger = logging.getLogger(__name__)
+
+TOLERANCE = 0.0001
+
+def validate(df: DataFrame) -> DataFrame:
+
+    logger.info("Validating: high must be highest value...")
+    df = df.filter(
+        (col("high") >= col("open")  - TOLERANCE) &
+        (col("high") >= col("close") - TOLERANCE) &
+        (col("high") >= col("low")   - TOLERANCE)
+    )
+
+    logger.info("Validating: low must be lowest value...")
+    df = df.filter(
+        (col("low") <= col("open")  + TOLERANCE) &
+        (col("low") <= col("close") + TOLERANCE) &
+        (col("low") <= col("high")  + TOLERANCE)
+    )
+
+    logger.info("Validating: price must match close...")
+    df = df.filter(
+        spark_abs(col("price") - col("close")) < TOLERANCE
+    )
+
+    logger.info("Validating: volume must be positive...")
+    df = df.filter(col("volume") > 0)
+
+    logger.info("Validation complete.")
+    return df
+
+# feature_engineer.py
+import logging
+
+from pyspark.sql.functions import col, greatest, least
+from pyspark.sql import DataFrame
+
+logger = logging.getLogger(__name__)
+
+
+
+
+def feature_engineer(df: DataFrame) -> DataFrame:
+    logger.info("="*75)
+    logger.info("Engineering features....")
+    df = df.withColumn("price_range", col("high") - col("low"))
+    logger.info("[TRANSFORM]Price range added")
+    
+    logger.info("="*75)
+    logger.info("Calculating and adding body size....")
+    from pyspark.sql.functions import abs as spark_abs
+    df = df.withColumn("body_size", spark_abs(col("close") - col("open")))
+    logger.info("[TRANSFORM]Body size column added....")
+
+    logger.info("="*75)
+    logger.info("Calculating and adding upper shadow....")
+    df = df.withColumn("upper_shadow", col("high") - greatest(col("open"), col("close")))
+    logger.info("[TRANSFORM]Upper shadow column added....")
+
+    logger.info("="*75)
+    logger.info("Calculating and adding lower shadow....")
+    df = df.withColumn("lower_shadow", least(col("open"), col("close")) - col("low"))
+    logger.info("[TRANSFORM]Lower shadow column added....")
+
+    logger.info("="*75)
+    logger.info("Calculating and adding if bullish or not....")
+    df = df.withColumn("is_bullish", col("close") > col("open"))
+    logger.info("[TRANSFORM]Is bullish column added ....")
+
+    logger.info("Feature engineering complete.")
+
+    return df
