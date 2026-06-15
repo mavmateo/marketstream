@@ -46,6 +46,7 @@ class StockConsumer :
                 value_deserializer = lambda x: json.loads(x.decode('utf-8')),
                 
             )
+            logger.info("="*75)
             logger.info("Kafka consumer initiated...")
 
         except NoBrokersAvailable as exc:
@@ -55,19 +56,17 @@ class StockConsumer :
             ) from exc 
         
         self._consumer.subscribe([self.topic])
+        logger.info("="*75)
         logger.info("Subscribed to topic(s). Waiting for messages...")    
 
 
-    def _listen(self) -> None:
-                   
+    def _listen(self) -> None:                
         try:
             for msg in self._consumer:
                 if not self._running: 
                     break
-                                       
-                
-                try:
-                    
+                                                       
+                try:                    
                     logger.info("=" * 75)
                     logger.info(f"Received Message:")
                     logger.info(f"   Topic    : {msg.topic}")
@@ -76,15 +75,16 @@ class StockConsumer :
                     logger.info(f"   Key      : {msg.key}")
                     logger.info("   Value    : %s", str(msg.value)[:200])  
                     logger.info("=" * 75)
-                    
-                    
 
+                    logger.debug("Topic: %s Symbol: %s Offset: %d", 
+                                 msg.topic, msg.value.get("symbol"), msg.offset)
+                    
+                    self.callback(msg.value)   
+                   
                 except Exception as e:
-                    logger.info(f"Failed to decode message: {e}")
-
-                self.callback(msg.value)     
-             
-
+                    logger.info("Failed to process message: %s", e, exc_info=True)
+                    continue
+       
         except KeyboardInterrupt:
            logger.info("Stopping consumer...")
 
@@ -108,11 +108,14 @@ def _smoke_test() -> None:
         logger.info("="*75)
         received.append(msg)
         logger.info(
-            f"[{msg['timestamp']}] {msg['symbol']:10s} "
-            f"O={msg['open']:.2f} H={msg['high']:.2f} "
-            f"L={msg['low']:.2f}  C={msg['close']:.2f} "
-            f"vol={msg['volume']:.3f}"
-        )
+        "[%s] %s O=%.2f H=%.2f L=%.2f C=%.2f vol=%.3f",
+        msg['timestamp'], msg['symbol'],
+        msg['open'], msg['high'],
+        msg['low'],  msg['close'], msg['volume']
+    )
+
+        if len(received) >= 5:
+         consumer_instance.stop()
 
 
     consumer_instance = StockConsumer(
@@ -121,9 +124,9 @@ def _smoke_test() -> None:
     callback = on_message
     )
     consumer_instance.run()
+    print(f"Smoke test complete. Received {len(received)} messages." )
 
-    if len(received) >= 5:
-      consumer_instance.stop()
+   
 
    
 

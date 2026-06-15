@@ -213,17 +213,12 @@ def main() -> None:
         
         clean_stream = _transform(parsed_stream)
 
-        # debug_query = (parsed_stream.groupBy("market")
-        #                               .count()
-        #                               .writeStream
-        #                               .format("console")
-        #                               .outputMode("complete")
-        #                               .start())
+      
 
         kafka_query = _write_kafka(clean_stream, kafka_config)
         timescale_query = _write_timescale(clean_stream)
         logger.info("All streams started. Awaiting termination....")
-        spark.streams.awaitAnyTermination
+        spark.streams.awaitAnyTermination()
 
    except KeyboardInterrupt:
         logger.info("Streaming stopped by user.")
