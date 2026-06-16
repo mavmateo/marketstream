@@ -67,14 +67,14 @@ class StockConsumer :
                     break
                                                        
                 try:                    
-                    logger.info("=" * 75)
+                    logger.info("=" * 85)
                     logger.info(f"Received Message:")
                     logger.info(f"   Topic    : {msg.topic}")
                     logger.info(f"   Partition: {msg.partition}")
                     logger.info(f"   Offset   : {msg.offset}")
                     logger.info(f"   Key      : {msg.key}")
                     logger.info("   Value    : %s", str(msg.value)[:200])  
-                    logger.info("=" * 75)
+                    logger.info("=" * 85)
 
                     logger.debug("Topic: %s Symbol: %s Offset: %d", 
                                  msg.topic, msg.value.get("symbol"), msg.offset)
@@ -92,7 +92,7 @@ class StockConsumer :
 
 
     def stop(self) -> None:   
-        logger.info("="*75)
+        logger.info("="*85)
         logger.info("Stop requested on Kafka consuming.")
         self._running   = False
         self._consumer.close() 
@@ -101,11 +101,11 @@ class StockConsumer :
     
 
 def _smoke_test() -> None:
-    logger.info("="*75)
+    logger.info("="*85)
     received : list[dict] = []
 
     def on_message(msg: dict) -> None:
-        logger.info("="*75)
+        logger.info("="*85)
         received.append(msg)
         logger.info(
         "[%s] %s O=%.2f H=%.2f L=%.2f C=%.2f vol=%.3f",

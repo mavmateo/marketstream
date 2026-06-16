@@ -27,7 +27,7 @@ class CryptoConsumer:
 
 
     def run(self) -> None:
-            logger.info("="*75)
+            logger.info("="*85)
             self._running = True
             logger.info("Consuming clean crypto from kafka....")
             self.connect()
@@ -36,7 +36,7 @@ class CryptoConsumer:
 
 
     def connect(self) -> None:
-            logger.info("="*75)
+            logger.info("="*85)
             logger.info("Connecting to kafka....")
 
             try:
@@ -45,7 +45,7 @@ class CryptoConsumer:
                             value_deserializer = lambda x: json.loads(x.decode('utf-8')),
 
                     )
-                    logger.info("="*75)
+                    logger.info("="*85)
                     logger.info("Kafka consumer initiated....")
 
             except NoBrokersAvailable as exc:
@@ -55,7 +55,7 @@ class CryptoConsumer:
                     ) from exc
             
             self._consumer.subscribe([self.topic])
-            logger.info("="*75)
+            logger.info("="*85)
             logger.info("Subscribed to topic(s). Waiting for messages...")
 
 
@@ -66,14 +66,14 @@ class CryptoConsumer:
                                 break
                         
                         try:
-                            logger.info("=" * 75)
+                            logger.info("=" * 85)
                             logger.info("Received Message:")
                             logger.info("   Topic    :%s",  {msg.topic})
                             logger.info("   Partition:%s", {msg.partition})
                             logger.info("   Offset   :%s", {msg.offset})
                             logger.info("   Key      :%s", {msg.key})
                             logger.info("   Value    : %s", str(msg.value)[:200])  
-                            logger.info("=" * 75)
+                            logger.info("=" * 85)
 
                             logger.debug("Topic: %s Symbol: %s Offset: %d", 
                                         msg.topic, msg.value.get("symbol"), msg.offset)
@@ -95,11 +95,11 @@ class CryptoConsumer:
 
 
 def _smoke_test() -> None:
-    logger.info("="*75)
+    logger.info("="*85)
     received : list[dict] = []    
 
     def on_message(msg: dict) -> None: 
-        logger.info("="*75)
+        logger.info("="*85)
         received.append(msg)
         logger.info(
         "[%s] %s O=%.2f H=%.2f L=%.2f C=%.2f vol=%.3f",
