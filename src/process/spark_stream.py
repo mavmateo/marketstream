@@ -113,15 +113,25 @@ def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery
                                     to_json(struct(*[col(c) for c in clean_stream.columns
                                                     if c != "topic"]))
                         )
-                        .withColumn("key", col("symbol"))
-                        .select("topic", "key", "value")                             
+                        .withColumn("key", col("symbol").cast("string"))
+                        .select("topic", "key", "value") 
+                                                   
                     )
+        def _debug_batch(batch_df, batch_id):
+            topics = [row["topic"] for row in
+                      batch_df.groupBy("topic").count().collect()]
+            logger.info("[DEBUG] Batch %d — topics being written: %s",
+                        batch_id, topics)
+        
+        
         return (kafka_df.writeStream
-                .format("kafka")
-                .option("kafka.bootstrap.servers", ",".join(config.bootstrap_servers))
-                        .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
-                        .start())
-    
+                .foreachBatch(_debug_batch)
+                .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
+                        .start()
+                        )
+        
+        
+       
     except Exception as e:
         logger.error("[WRITE]Failed to write clean stream to Kafka: %s", e, exc_info=True)
         raise
