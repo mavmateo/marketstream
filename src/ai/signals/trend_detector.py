@@ -7,63 +7,67 @@ logger = logging.getLogger(__name__)
 STRONG_BODY_THRESHOLD = 0.70
 WEAK_BODY_THRESHOLD = 0.40
 
+def _classify(tick: dict) -> tuple[str, float]:
+    logger.info("="*75)
+    logger.info("Classifying ticks....")
+
+    direction = "NEUTRAL" 
+
+    confidence = tick['body_size'] / tick['price_range']
+
+
+    if tick.get("price_range", 0) == 0:
+     return "NEUTRAL", 0.0
+
+    if tick['confidence'] > STRONG_BODY_THRESHOLD and tick['is_bullish']:
+        direction = "STRONG_BULLISH"
+    elif tick['confidence'] > STRONG_BODY_THRESHOLD and not tick['is_bullish']:
+        direction = "STRONG_BEARISH"
+    elif tick['confidence'] > WEAK_BODY_THRESHOLD and tick['is_bullish']:
+        direction = "WEAK_BULLISH"
+    elif tick['confidence'] > WEAK_BODY_THRESHOLD and not tick['is_bullish']:
+        direction = "WEAK_BEARISH"
+    else:
+        direction = "NEUTRAL"  
+
+    return confidence, direction
+
+
+
 def detect(tick: dict) -> dict:
     logger.info("="*75)
     logger.info("Detecting trend signals.....")
 
-    signal = {
-        "time": tick["timestamp"],
-        "symbol": tick["symbol"],
-        "confidence": tick['body_size'] / tick['price_range'],
-        "direction" : 
-    }
+    direction, confidence =  _classify(tick)
 
-    tick['confidence'] = tick['body_size'] / tick['price_range']
-    tick['predicted_price'] = None
-    tick['direction'] = None
-    tick['signal_type'] = None
-    signal["details"] = {
-    "body_ratio":    confidence,
-    "upper_shadow":  tick["upper_shadow"],
-    "lower_shadow":  tick["lower_shadow"],
+    signal= {
+        "time" : tick["timestamp"],
+        "symbol" : tick["symbol"],
+        "market" : tick["market"],
+        "signal_type" : "trend",
+        "direction" : direction,
+        "confidence" : confidence,
+        "predicted_price" : None,
+            "details": {
+        "body_ratio":   confidence,
+        "upper_shadow": tick["upper_shadow"],
+        "lower_shadow": tick["lower_shadow"],
+          }
+   
      }
 
     logger.info(
-        "[%s] %s C=%.2f P=%.2f D=%.2f C=%.2f vol=%.3f",
-        signal["timestamp"], signal["symbol"],
-        signal["confidence"], signal["direction"], 
-        signal["predicted_price"], signal["signal_type"], signal["details"]
-    )
+    "[%s] %s  direction=%s  confidence=%.4f",
+    signal["time"], signal["symbol"],
+    signal["direction"], signal["confidence"],
+)
 
     return signal
 
 
 
 
-def _classify(tick: dict) -> tuple[str, float]:
-    logger.info("="*75)
-    logger.info("Classifying ticks....")
-    if tick.get("price_range", 0) == 0:
-     return "NEUTRAL", 0.0
 
-    tick['confidence'] = tick['body_size'] / tick['price_range']
-
-    if tick['confidence'] > STRONG_BODY_THRESHOLD and tick['is_bullish'] == "True":
-        tick['direction'] = "STONG_BULLISH"
-
-    if tick['confidence'] > STRONG_BODY_THRESHOLD and tick['is_bullish'] == " False":
-        tick['direction'] = "WEAK_BULLISH"    
-
-    if  tick['confidence'] < WEAK_BODY_THRESHOLD and tick['is_bullish'] == "False":
-        tick['direction'] = "STRONG_BEARISH"
-
-    if tick['confidence'] < WEAK_BODY_THRESHOLD and tick['is_bullish'] == "True":
-        tick['direction']  = "WEAK_BEARISH"  
-
-    if tick['confidence'] <  STRONG_BODY_THRESHOLD and tick['body_ratio'] > WEAK_BODY_THRESHOLD:
-        tick['direction'] = "NEUTRAL"   
-
-        return tick['confidence'], tick['direction']
         
 
     
