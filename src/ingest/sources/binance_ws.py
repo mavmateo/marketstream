@@ -90,11 +90,11 @@ class BinanceWebSocket:
                 self._tick_count  = 0
                 self._connect_time: float | None = None
 
-
+                logger.info("="*75)
                 logger.info(
                       "BinanceWebSocket initialised | symbols=%s interval=%s emit_open=%s",
-                       self.symbols, self.interval, self.emit_open,
-                )
+                       self.symbols, self.interval, self.emit_open,)
+                logger.info("="*75)
     async def run(self) -> None:
          self._running = True
          backoff       = _BACKOFF_INITIAL
@@ -102,10 +102,12 @@ class BinanceWebSocket:
 
          while self._running:
               attempt += 1
+              logger.info("="*75)
               logger.info(
                    "Connecting to Binance stream (attempt %d) | url=%s",
                 attempt, self._url,
-              )      
+              ) 
+              logger.info("="*75)     
 
               try:
                    async with websockets.connect(
@@ -115,15 +117,21 @@ class BinanceWebSocket:
                         close_timeout=5,
                    )   as ws:
                         self._connect_time = time.monotonic()
+                        logger.info("="*75)
                         logger.info("Binance Websocket connected.") 
+                        logger.info("="*75)
                         await self._listen(ws)
 
               except ConnectionClosedOK: 
+                   logger.info("="*75)
                    logger.info("Binance Websocket closed cleanly.") 
+                   logger.info("="*75)
                    break
 
               except ConnectionClosedError as exc:
-                   logger.warning("Binance connection dropped: %s", exc)   
+                   logger.info("="*75)
+                   logger.warning("Binance connection dropped: %s", exc) 
+                   logger.info("="*75)  
 
               except WebSocketException as exc:
                 logger.error("Binance WebSocket error: %s", exc)
@@ -149,12 +157,16 @@ class BinanceWebSocket:
               logger.info("Reconnecting in %s seconds ...", backoff)
               await asyncio.sleep(backoff)  
 
+         logger.info("="*75)
          logger.info(
                "BinanceWebSocket stopped. Total ticks emitted: %d", self._tick_count
-         )        
+         )  
+         logger.info("="*75)      
 
     def stop(self) -> None:
+         logger.info("="*75)
          logger.info("Stop requested on BinanceWebSocket.")
+         logger.info("="*75)
          self._running = False
 
 

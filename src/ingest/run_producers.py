@@ -42,7 +42,9 @@ async def _run() -> None:
         if isinstance(result, Exception):
             logger.error("Producer %s exited with error: %s", 
                          producer.__class__.__name__, result)
-    logger.info("All producers stopped")        
+    logger.info("="*50)        
+    logger.info("All producers stopped")   
+    logger.info("="*50)     
     
     
     

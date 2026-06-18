@@ -83,12 +83,11 @@ class AlpacaWebSocket:
         self._bar_count  = 0
         self._connect_time: float | None = None
 
-        
+        logger.info("="*75)
         logger.info(
             "AlpacaWebsocket initiated | symbols=%s interval=%s",
-            self.symbols, self.interval,
-            
-        )
+            self.symbols, self.interval,)
+        logger.info("="*75)
 
     async def run(self) -> None:
         self._running   = True
@@ -97,10 +96,12 @@ class AlpacaWebSocket:
 
         while self._running:
             attempt += 1
+            logger.info("="*75)
             logger.info(
                 "Connecting to Alpaca stream (attempt %d) | url=%s",
                 attempt, self._url,
             )
+            logger.info("="*75)
 
             try:
                 async with websockets.connect(
@@ -110,7 +111,9 @@ class AlpacaWebSocket:
                     close_timeout=5,
                 ) as ws:
                     self._connect_time = time.monotonic()
+                    logger.info("="*75)
                     logger.info("Alpaca Websocket connected.")
+                    logger.info("="*75)
 
                     await ws.recv()
 
@@ -131,7 +134,9 @@ class AlpacaWebSocket:
                     }))
 
                     sub_response = json.loads(await ws.recv())
+                    logger.info("="*75)
                     logger.info("Subscription confirmed: %s", sub_response)
+                    logger.info("="*75)
 
                     await self._listen(ws)
 
@@ -167,12 +172,14 @@ class AlpacaWebSocket:
             logger.info("Reconnecting in %s seconds ...", backoff)
             await asyncio.sleep(backoff)
 
-        logger.info(
-            "AlpacaWebSocket stopped. Total bars emitted: %d", self._bar_count
-        )                            
+        logger.info("="*75)
+        logger.info("AlpacaWebSocket stopped. Total bars emitted: %d", self._bar_count)
+        logger.info("="*75)                            
     
     def stop(self) -> None:
+        logger.info("="*75)
         logger.info("Stop requested on AlpacaWebSocket.")
+        logger.info("="*75)
         self._running = False
         
     async def _listen(self, ws) -> None:

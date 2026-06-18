@@ -100,6 +100,8 @@ def _transform(df: DataFrame) -> DataFrame:
     return clean_df
 
 def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery:
+    logger.info("[DEBUG] CLEAN_STOCKS_TOPIC=%s  CLEAN_CRYPTO_TOPIC=%s",
+            config.CLEAN_STOCKS_TOPIC, config.CLEAN_CRYPTO_TOPIC)
     try:
         logger.info("="*75)
         logger.info("[WRITE]Writing clean stream to kafka....")
@@ -118,10 +120,17 @@ def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery
                                                    
                     )
         def _debug_batch(batch_df, batch_id):
-            topics = [row["topic"] for row in
-                      batch_df.groupBy("topic").count().collect()]
-            logger.info("[DEBUG] Batch %d — topics being written: %s",
-                        batch_id, topics)
+            total = batch_df.count()
+
+            by_topic = batch_df.groupBy("topic").count().collect()
+
+            from pyspark.sql.functions import get_json_object
+            by_market = (batch_df.withColumn("market", get_json_object(col("value"), "$.market"))
+                                 .groupBy("market","topic")
+                                 .count()
+                                 .count())
+            logger.info("[DEBUG] Batch %d — total=%d by_topic=%s by_market=%s",
+                batch_id, total, by_topic, by_market)
         
         
         return (kafka_df.writeStream
