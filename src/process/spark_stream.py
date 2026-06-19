@@ -110,6 +110,7 @@ def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery
                         .withColumn("topic",
                            when(col("market")=="stock", config.CLEAN_STOCKS_TOPIC)
                            .when(col("market")=="crypto", config.CLEAN_CRYPTO_TOPIC)
+                           .otherwise("unknown")
                         )
                            .withColumn("value",
                                     to_json(struct(*[col(c) for c in clean_stream.columns
@@ -125,23 +126,27 @@ def _write_kafka(clean_stream: DataFrame, config: KafkaConfig) -> StreamingQuery
             by_topic = batch_df.groupBy("topic").count().collect()
 
             from pyspark.sql.functions import get_json_object
-            by_market = (batch_df.withColumn("market", get_json_object(col("value"), "$.market"))
-                                 .groupBy("market","topic")
+            by_market = (batch_df.withColumn("mkt", get_json_object(col("value"), "$.market"))
+                                 .groupBy("mkt","topic")
                                  .count()
-                                 .count())
+                                 .collect()
+                                 )
             logger.info("[DEBUG] Batch %d — total=%d by_topic=%s by_market=%s",
                 batch_id, total, by_topic, by_market)
         
         
         return (kafka_df.writeStream
-                .foreachBatch(_debug_batch)
-                .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
-                        .start()
+            .format("kafka")
+            .option("kafka.bootstrap.servers", ",".join(config.bootstrap_servers))
+            .option("checkpointLocation", "/tmp/checkpoints/write_kafka")
+            .outputMode("append")
+            .start()
                         )
         
         
        
     except Exception as e:
+        logger.info("="*75)
         logger.error("[WRITE]Failed to write clean stream to Kafka: %s", e, exc_info=True)
         raise
 

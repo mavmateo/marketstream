@@ -10,6 +10,8 @@ from kafka.errors import KafkaError,  NoBrokersAvailable
 
 logger = logging.getLogger(__name__)
 
+from ai.signals.trend_detector import detect
+
 
 
 class StockConsumer : 
@@ -104,15 +106,16 @@ def _smoke_test() -> None:
     logger.info("="*85)
     received : list[dict] = []
 
-    def on_message(msg: dict) -> None:
+    def on_message(tick: dict) -> None:
         logger.info("="*85)
-        received.append(msg)
+        received.append(tick)
+        signal = detect(tick)
+        
         logger.info(
-        "[%s] %s O=%.2f H=%.2f L=%.2f C=%.2f vol=%.3f",
-        msg['timestamp'], msg['symbol'],
-        msg['open'], msg['high'],
-        msg['low'],  msg['close'], msg['volume']
-    )
+            "[%s] %-10s  direction=%-15s confidence=%.3f",
+            signal["time"], signal["symbol"],
+            signal["direction"], signal["confidence"],
+        )
 
         if len(received) >= 5:
          consumer_instance.stop()

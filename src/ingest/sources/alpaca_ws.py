@@ -43,7 +43,9 @@ def _parse_bar(msg: list) -> list[dict]:
                     "high":  float(item["h"]),
                     "low"  : float(item["l"]),
                     "close" : float(item["c"]),
+                    "price" : float(item["c"]),
                     "volume" : float(item["v"]),
+                    "interval" : "1Min",
                     "trades" :  int(item.get("n",0)),
                     "vwap" :   float(item.get("vw", 0)),
                     "closed" : True
