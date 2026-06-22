@@ -13,19 +13,21 @@ def _classify(tick: dict) -> tuple[str, float]:
 
     direction = "NEUTRAL" 
 
-    confidence = tick['body_size'] / tick['price_range']
+    
 
 
     if tick.get("price_range", 0) == 0:
      return "NEUTRAL", 0.0
+    
+    confidence = tick['body_size'] / tick['price_range']
 
-    if tick['confidence'] > STRONG_BODY_THRESHOLD and tick['is_bullish']:
+    if confidence > STRONG_BODY_THRESHOLD and tick['is_bullish']:
         direction = "STRONG_BULLISH"
-    elif tick['confidence'] > STRONG_BODY_THRESHOLD and not tick['is_bullish']:
+    elif confidence > STRONG_BODY_THRESHOLD and not tick['is_bullish']:
         direction = "STRONG_BEARISH"
-    elif tick['confidence'] > WEAK_BODY_THRESHOLD and tick['is_bullish']:
+    elif confidence > WEAK_BODY_THRESHOLD and tick['is_bullish']:
         direction = "WEAK_BULLISH"
-    elif tick['confidence'] > WEAK_BODY_THRESHOLD and not tick['is_bullish']:
+    elif confidence > WEAK_BODY_THRESHOLD and not tick['is_bullish']:
         direction = "WEAK_BEARISH"
     else:
         direction = "NEUTRAL"  
@@ -38,7 +40,7 @@ def detect(tick: dict) -> dict:
     logger.info("="*75)
     logger.info("Detecting trend signals.....")
 
-    direction, confidence =  _classify(tick)
+    confidence, direction =  _classify(tick)
 
     signal= {
         "time" : tick["timestamp"],
