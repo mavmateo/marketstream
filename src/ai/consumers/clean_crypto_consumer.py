@@ -114,7 +114,7 @@ def _smoke_test() -> None:
         )
 
     if len(received) >= 5:
-        consumer_instance.stop() 
+     consumer_instance.stop() 
 
     consumer_instance = CryptoConsumer(
         topic = KafkaConfig().CLEAN_CRYPTO_TOPIC,
