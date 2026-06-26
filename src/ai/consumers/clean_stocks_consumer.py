@@ -11,6 +11,7 @@ from kafka.errors import KafkaError,  NoBrokersAvailable
 logger = logging.getLogger(__name__)
 
 from ai.signals.trend_detector import detect
+from ai.signals.anomaly_detector import AnomalyDetector
 
 
 
@@ -106,18 +107,23 @@ def _smoke_test() -> None:
     logger.info("="*85)
     received : list[dict] = []
 
+    anomaly_detector = AnomalyDetector()
+
     def on_message(tick: dict) -> None:
         logger.info("="*85)
         received.append(tick)
-        signal = detect(tick)
+
+        trend_signal = detect(tick)
+        anomaly_signal = anomaly_detector.detect(tick)
+
         
         logger.info(
-            "[%s] %-10s  direction=%-15s confidence=%.3f",
-            signal["time"], signal["symbol"],
-            signal["direction"], signal["confidence"],
+            "[%s] %-10s  trend=%-15s anomaly=%-8s confidence=%.3f",
+            tick["time"], tick["symbol"],
+            trend_signal["direction"], anomaly_signal["direction"],anomaly_signal["confidence"],
         )
 
-        if len(received) >= 5:
+        if len(received) >= 50:
          consumer_instance.stop()
 
 
