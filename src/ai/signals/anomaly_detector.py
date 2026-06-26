@@ -15,6 +15,9 @@ MIN_HISTORY = 10
 
 
 
+
+
+
 class AnomalyDetector: 
 
     def __init__(self) -> None:

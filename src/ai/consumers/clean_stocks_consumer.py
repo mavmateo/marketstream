@@ -119,7 +119,7 @@ def _smoke_test() -> None:
         
         logger.info(
             "[%s] %-10s  trend=%-15s anomaly=%-8s confidence=%.3f",
-            tick["time"], tick["symbol"],
+            tick["timestamp"], tick["symbol"],
             trend_signal["direction"], anomaly_signal["direction"],anomaly_signal["confidence"],
         )
 
