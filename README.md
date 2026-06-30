@@ -1,11 +1,14 @@
 # MarketStream — Real-Time Stock & Crypto Price Intelligence Platform
 
 A production-grade, end-to-end pipeline for streaming, processing, predicting,
-and visualising live market data — deployed on a single AWS EC2 instance.
+and visualising live market data .
 
 ---
 
 ## Architecture Overview
+
+![Project Screenshot](architecture.png)
+
 
 ```
 External APIs (Alpaca / Binance / Polygon)
