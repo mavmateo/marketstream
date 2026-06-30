@@ -9,6 +9,8 @@ from kafka.errors import KafkaError, NoBrokersAvailable
 
 from ai.signals.trend_detector import detect
 from ai.signals.anomaly_detector import AnomalyDetector
+from ai.models.price_predictor import PricePredictor
+
 
 
 
@@ -104,6 +106,7 @@ def _smoke_test() -> None:
     received : list[dict] = []    
 
     anomal_detector = AnomalyDetector()
+    price_predictor = PricePredictor()
 
     def on_message(tick: dict) -> None: 
         logger.info("="*85)
@@ -111,11 +114,12 @@ def _smoke_test() -> None:
 
         trend_signal = detect(tick)
         anomaly_signal = anomal_detector.detect(tick)
+        predicted_price = price_predictor.predict(tick)
         
         logger.info(
-            "[%s] %-10s  trend=%-15s anomaly=%-8s confidence=%.3f",
+            "[%s] %-10s  trend=%-15s anomaly=%-8s confidence=%.3f predicted_price=%.3f",
             tick["timestamp"], tick["symbol"],
-            trend_signal["direction"], anomaly_signal["direction"],anomaly_signal["confidence"],
+            trend_signal["direction"], anomaly_signal["direction"],anomaly_signal["confidence"],predicted_price["predicted_price"]
         )
 
     if len(received) >= 50:

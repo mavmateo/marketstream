@@ -35,7 +35,7 @@ class PricePredictor:
 
     def predict(self, tick) -> dict:
         logger.info("="*85) 
-        logger.info("*Predicting price based on recent symbol close price history....*")
+        logger.info("Predicting price based on recent symbol close price history....")
 
         close_price_history = self._get_history(tick["symbol"], self.close_prices_symbol, PREDICTION_WINDOW)
 
@@ -50,7 +50,7 @@ class PricePredictor:
                     "direction":   "INSUFFICIENT_DATA",
                     "confidence":  0.0,
                     "predicted_price": None,
-                    "details":     {"reason": "not enough history yet",
+                    "details":     {
                                      "candles_seen": len(close_price_history)}
              }
         

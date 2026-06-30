@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 from ai.signals.trend_detector import detect
 from ai.signals.anomaly_detector import AnomalyDetector
+from ai.models.price_predictor import PricePredictor
 
 
 
@@ -108,6 +109,7 @@ def _smoke_test() -> None:
     received : list[dict] = []
 
     anomaly_detector = AnomalyDetector()
+    price_predictor = PricePredictor()
 
     def on_message(tick: dict) -> None:
         logger.info("="*85)
@@ -115,12 +117,18 @@ def _smoke_test() -> None:
 
         trend_signal = detect(tick)
         anomaly_signal = anomaly_detector.detect(tick)
+        prediction_signal = price_predictor.predict(tick)
 
         
         logger.info(
-            "[%s] %-10s  trend=%-15s anomaly=%-8s confidence=%.3f",
-            tick["timestamp"], tick["symbol"],
-            trend_signal["direction"], anomaly_signal["direction"],anomaly_signal["confidence"],
+            "[%s] %-10s  trend=%-15s  anomaly=%-8s  confidence=%.3f  predicted=%-12s  direction=%s",
+            tick["timestamp"],
+            tick["symbol"],
+            trend_signal["direction"],
+            anomaly_signal["direction"],
+            prediction_signal["confidence"],
+            prediction_signal["predicted_price"],   
+            prediction_signal["direction"],
         )
 
         if len(received) >= 50:
