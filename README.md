@@ -1,6 +1,6 @@
-# MarketStream — Real-Time Stock & Crypto Price Intelligence Platform
+# MarketStream — Real-Time Financial Market Data Intelligence Platform
 
-A production-grade, end-to-end pipeline for streaming, processing, predicting,
+An end-to-end pipeline for streaming, processing, predicting, anomaly & fraud detection
 and visualising live market data .
 
 ---
