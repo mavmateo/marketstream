@@ -84,6 +84,15 @@ def _build_on_tick(trend_detector, anomaly_detector, price_predictor) -> Callabl
 def _run() -> None:
     logger.info("="*85)
 
+    stock_thread = threading.thread(target = stock_consumer.run, daemon = True)
+    crypto_thread = threading.Thread(target=crypto_consumer.run, daemon=True)
+
+    stock_thread.start()
+    crypto_thread.start()
+
+    stock_thread.join()
+    crypto_thread.join()
+
     on_tick = _build_on_tick(detect, anomaly_detector, price_predictor)
 
 
