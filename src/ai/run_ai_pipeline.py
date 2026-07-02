@@ -3,7 +3,6 @@ import threading
 import psycopg2
 import json
 
-from typing import Callable
 from psycopg2 import OperationalError
 
 from config.kafka_config import KafkaConfig
@@ -65,11 +64,11 @@ def _write_signals(signals: list[dict]) -> None:
 
 
 
-def _build_on_tick(trend_detector, anomaly_detector, price_predictor):
+def _build_on_tick(trend_fn, anomaly_detector: AnomalyDetector, price_predictor: PricePredictor):
     
     def on_tick(tick : dict) -> None:
         try:
-            trend_signal = trend_detector.detect(tick)
+            trend_signal = trend_fn(tick)
             anomaly_signal = anomaly_detector.detect(tick)
             prediction_signal = price_predictor.predict(tick)    
             _write_signals([trend_signal,anomaly_signal,prediction_signal])
