@@ -4,20 +4,12 @@ import psycopg2
 import json
 
 from typing import Callable
+from psycopg2 import OperationalError
 
 from config.kafka_config import KafkaConfig
-
-
 from ai.signals.trend_detector import detect
-
-
 from ai.models.price_predictor import PricePredictor
-from ai.models.prophet_model import ProphetModel
-from ai.models.lstm_model import LSTMModel
-from ai.signals.sentiment_analyzer import SentimentAnalyzer
-from ai.signals.trend_detector import TrendDetector
 from ai.signals.anomaly_detector import AnomalyDetector
-
 from ai.consumers.clean_crypto_consumer import CryptoConsumer
 from ai.consumers.clean_stocks_consumer import StockConsumer
 
@@ -28,72 +20,74 @@ logger = logging.getLogger(__name__)
 def _write_signals(signals: list[dict]) -> None:
     logger.info("="*85)
     logger.info("Writing signals to timescaledb ....")
+    logger.info("="*85)
+
+    try:
     
-    conn = psycopg2.connect(
+        conn = psycopg2.connect(
         host ="localhost", port = 5432,
         dbname = "marketstream", user = "postgres",
-        password = "postgres"
+        password = "postgres")
+        logger.info(" Successfully connected to TimescaleDB....")
 
-    )
+        cursor = conn.cursor()
 
-    cursor = conn.cursor()
+        for signal in signals:
+            if signal["direction"] in ("INSUFFICIENT_DATA",):
+                continue
 
-    for signal in signals:
-        if signal["direction"] in ("INSUFFICIENT_DATA",):
-            continue
+            cursor.execute("""
 
-
-        cursor.execute("""
-
-                   INSERT INTO ai_signals
-                (time, symbol, market, signal_type, direction,
-                 confidence, predicted_price, details)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            signal["time"],
-            signal["symbol"],
-            signal["market"],
-            signal["signal_type"],
-            signal["direction"],
-            signal["confidence"],
-            signal.get("predicted_price"),
-            json.dumps(signal["details"]),
-        ))
+                    INSERT INTO ai_signals
+                    (time, symbol, market, signal_type, direction,
+                    confidence, predicted_price, details)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                signal["time"],
+                signal["symbol"],
+                signal["market"],
+                signal["signal_type"],
+                signal["direction"],
+                signal["confidence"],
+                signal.get("predicted_price"),
+                json.dumps(signal["details"]),
+            ))
 
         conn.commit()
-        cursor.close()
-        conn.close()
+        
+    except OperationalError as e:
+        logger.info("TimescaleDB write failed: %s", e)
+
+    finally:
+       if cursor: cursor.close()
+       if conn:   conn.close()
 
 
 
 
-
-def _build_on_tick(trend_detector, anomaly_detector, price_predictor) -> Callable:
+def _build_on_tick(trend_detector, anomaly_detector, price_predictor):
     
     def on_tick(tick : dict) -> None:
+        try:
+            trend_signal = trend_detector.detect(tick)
+            anomaly_signal = anomaly_detector.detect(tick)
+            prediction_signal = price_predictor.predict(tick)    
+            _write_signals([trend_signal,anomaly_signal,prediction_signal])
 
-        trend_signal = trend_detector(tick)
-        anomaly_signal = anomaly_detector(tick)
-        prediction_signal = price_predictor(tick)
-    
-        _write_signals(trend_signal,anomaly_signal,prediction_signal)
+        except Exception as e:
+            logger.error("on_tick failed for %s: %s", 
+                         tick.get("symbol"), e, exc_info=True)
 
     return on_tick    
 
 
+
 def _run() -> None:
-    logger.info("="*85)
+    config = KafkaConfig()
+    anomaly = AnomalyDetector()
+    predictor = PricePredictor()
 
-    stock_thread = threading.thread(target = stock_consumer.run, daemon = True)
-    crypto_thread = threading.Thread(target=crypto_consumer.run, daemon=True)
-
-    stock_thread.start()
-    crypto_thread.start()
-
-    stock_thread.join()
-    crypto_thread.join()
-
-    on_tick = _build_on_tick(detect, anomaly_detector, price_predictor)
+    on_tick = _build_on_tick(detect, anomaly, predictor)
 
 
     stock_consumer = StockConsumer(
@@ -106,30 +100,33 @@ def _run() -> None:
         callback = on_tick
     )
 
+    stock_thread = threading.Thread(target = stock_consumer.run, daemon = True)
+    crypto_thread = threading.Thread(target= crypto_consumer.run, daemon=True)
+
+    try:
+        
+        stock_thread.start()
+        crypto_thread.start()
+
+        stock_thread.join()
+        crypto_thread.join()
+
+    except KeyboardInterrupt:  
+        logger.info("Shutdown requested - stopping consumers.")
+        stock_consumer.stop()
+        crypto_consumer.stop()
+    except Exception as e:
+        logger.error("AI pipeline failed: %s", e, exc_info=True)    
+         
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    if __name__ == "__main__":
-        logging.basicConfig(
-            level  = logging.INFO,
-            format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-        )
-        _run()
+if __name__ == "__main__":
+    logging.basicConfig(
+        level  = logging.INFO,
+        format = "%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    )
+    _run()
 
