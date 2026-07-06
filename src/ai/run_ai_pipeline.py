@@ -11,6 +11,7 @@ from ai.models.price_predictor import PricePredictor
 from ai.signals.anomaly_detector import AnomalyDetector
 from ai.consumers.clean_crypto_consumer import CryptoConsumer
 from ai.consumers.clean_stocks_consumer import StockConsumer
+from utils.db import get_db_cursor
 
 
 logger = logging.getLogger(__name__)
@@ -21,15 +22,7 @@ def _write_signals(signals: list[dict]) -> None:
     logger.info("Writing signals to timescaledb ....")
     logger.info("="*85)
 
-    try:
-    
-        conn = psycopg2.connect(
-        host ="localhost", port = 5432,
-        dbname = "marketstream", user = "postgres",
-        password = "postgres")
-        logger.info(" Successfully connected to TimescaleDB....")
-
-        cursor = conn.cursor()
+    with get_db_cursor() as cursor:
 
         for signal in signals:
             if signal["direction"] in ("INSUFFICIENT_DATA",):
@@ -52,17 +45,7 @@ def _write_signals(signals: list[dict]) -> None:
                 json.dumps(signal["details"]),
             ))
 
-        conn.commit()
-        
-    except OperationalError as e:
-        logger.info("TimescaleDB write failed: %s", e)
-
-    finally:
-       if cursor: cursor.close()
-       if conn:   conn.close()
-
-
-
+      
 
 def _build_on_tick(trend_fn, anomaly_detector: AnomalyDetector, price_predictor: PricePredictor):
     
@@ -72,6 +55,7 @@ def _build_on_tick(trend_fn, anomaly_detector: AnomalyDetector, price_predictor:
             anomaly_signal = anomaly_detector.detect(tick)
             prediction_signal = price_predictor.predict(tick)    
             _write_signals([trend_signal,anomaly_signal,prediction_signal])
+            logger.info("Signals successfully written to TimescaleDB....")
 
         except Exception as e:
             logger.error("on_tick failed for %s: %s", 

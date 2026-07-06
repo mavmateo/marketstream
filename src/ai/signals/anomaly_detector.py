@@ -1,6 +1,7 @@
 import logging
 
 from collections import deque
+from utils.decorators import log_signal
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class AnomalyDetector:
 
    
 
-
+    @log_signal
     def detect(self, tick) -> dict:  
         logger.info("="*85)
         logger.info("Detecting price and volume anomalies from recent history....")

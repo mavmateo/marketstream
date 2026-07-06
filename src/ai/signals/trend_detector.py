@@ -1,5 +1,7 @@
 import logging
 
+from utils.decorators import log_signal
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +36,7 @@ def _classify(tick: dict) -> tuple[str, float]:
     return confidence, direction
 
 
-
+@log_signal
 def detect(tick: dict) -> dict:
     logger.info("="*75)
     logger.info("Detecting trend signals.....")
