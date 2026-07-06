@@ -1,8 +1,10 @@
 import os
 import sys
 import logging
-from config.kafka_config import KafkaConfig
+import cProfile
+import pstats
 
+from config.kafka_config import KafkaConfig
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame
 from pyspark.sql.types import (
