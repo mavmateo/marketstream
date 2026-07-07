@@ -1,9 +1,7 @@
 import logging
 import threading
-import psycopg2
 import json
 
-from psycopg2 import OperationalError
 
 from config.kafka_config import KafkaConfig
 from ai.signals.trend_detector import detect
