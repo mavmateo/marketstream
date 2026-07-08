@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
+
+
 
 def dashboard_header(title="Market Dashboard"):
     st.title(title)
@@ -31,7 +34,8 @@ def display_ohlcv(df: pd.DataFrame, symbol: str):
     col1, col2 = st.columns([3, 2])
     
     with col1:
-        st.line_chart(df.set_index('time')[['open', 'high', 'low', 'close']])
+        fig = go.Figure(data=[go.Candlestick(x=df['time'], open=df['open'], high=df['high'], low=df['low'], close=df['close'])])
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.dataframe(

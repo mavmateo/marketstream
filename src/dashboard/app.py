@@ -1,35 +1,30 @@
 import streamlit as st
 import pandas as pd
-from layout import dashboard_header, main_content, sidebar_controls
 
-# Sample data (replace with your real data loading)
-@st.cache_data
-def load_data():
-    dates = pd.date_range(start="2025-01-01", periods=180)
-    return pd.DataFrame({
-        'date': dates,
-        'value': pd.Series(range(180)).rolling(30).mean() + pd.Series(range(180)).sample(frac=1).values * 0.3,
-        'category': pd.Series(['A', 'B', 'C', 'D']).sample(180, replace=True).values
-    })
+from dashboard.layout import dashboard_header, display_ohlcv, display_signals, sidebar_controls
+from dashboard.data_feeds import get_all_symbols, get_ohlcv, get_signals
 
-# Page config
-st.set_page_config(page_title="My Dashboard", layout="wide", initial_sidebar_state="expanded")
+from streamlit_autorefresh import st_autorefresh
 
-# Load data
-df = load_data()
 
-# Sidebar controls
-date_range, categories, show_raw = sidebar_controls()
+st.set_page_config(
+     page_title = "MarketStream",
+    layout     = "wide",
+    initial_sidebar_state = "expanded",
+)
 
-# Filter data based on sidebar input
-filtered_df = df.copy()  # Add your actual filtering logic here
 
-# Render layout
-dashboard_header("Business Dashboard", "Real-time Overview • July 2026")
+all_symbols = get_all_symbols()
 
-main_content(filtered_df)
+symbol, ohlcv_limit, signals_limit, auto_refresh  = sidebar_controls(all_symbols)
 
-if show_raw:
-    st.divider()
-    st.subheader("Full Dataset")
-    st.dataframe(filtered_df, use_container_width=True)
+if auto_refresh:
+    st_autorefresh(interval=1000, key="data_refresh")
+
+ohlcv_df = get_ohlcv(symbol , limit=ohlcv_limit)
+signals_df = get_signals(symbol, limit=signals_limit)
+
+
+dashboard_header()
+display_ohlcv(ohlcv_df,     symbol)
+display_signals(signals_df, symbol)
